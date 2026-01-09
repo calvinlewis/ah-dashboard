@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Absolute Humidity (Hourly) HRV Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
+    h1 { margin: 0 0 10px; }
+    .muted { color: #666; font-size: 14px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; flex: 1 1 300px; }
+    label { display: block; font-size: 14px; margin: 10px 0 6px; }
+    input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; }
+    button { padding: 10px 14px; font-size: 16px; border-radius: 10px; border: 1px solid #bbb; background: #f7f7f7; cursor: pointer; }
+    button:hover { background: #eee; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .big { font-size: 24px; font-weight: 650; margin-top: 8px; }
+    .ok { color: #0a7a2f; }
+    .warn { color: #b35c00; }
+    .bad { color: #b00020; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; vertical-align: top; }
+    th { position: sticky; top: 0; background: #fff; z-index: 1; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; font-size: 12px; }
+    .pill.ok { border-color: rgba(10,122,47,0.35); }
+    .pill.warn { border-color: rgba(179,92,0,0.35); }
+    .pill.bad { border-color: rgba(176,0,32,0.35); }
+    .scroll { max-height: 520px; overflow: auto; border: 1px solid #eee; border-radius: 10px; }
+  </style>
+</head>
+
+<body>
+  <h1>Absolute Humidity (Hourly) HRV Dashboard</h1>
+  <p class="muted">
+    Outdoor hourly forecast comes from Open-Meteo. Indoor values are assumed constant across the horizon unless you wire in a sensor feed.
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h2 style="margin:0 0 8px;">Indoor (you enter)</h2>
+      <label for="inT">Temperature (°C)</label>
+      <input id="inT" type="number" step="0.1" value="21.0" />
+
+      <label for="inRH">Relative Humidity (%)</label>
+      <input id="inRH" type="number" step="0.1" value="40.0" />
+
+      <label for="horizon">Forecast horizon</label>
+      <select id="horizon">
+        <option value="12">Next 12 hours</option>
+        <option value="24" selected>Next 24 hours</option>
+        <option value="48">Next 48 hours</option>
+        <option value="72">Next 72 hours</option>
+      </select>
+
+      <div class="muted" style="margin-top:10px;">
+        Indoor AH: <span id="inAH" class="mono">—</span> g/m³
+      </div>
+      <div class="muted" style="margin-top:6px;">
+        Threshold (g/m³): <span id="thr" class="mono">1.0</span> (edit in code if desired)
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin:0 0 8px;">Outdoor (auto)</h2>
+      <div class="muted">Location: <span id="loc" class="mono">—</span></div>
+
+      <div class="row" style="margin-top:10px;">
+        <button id="btnGeo">Use my location</button>
+        <button id="btnOttawa">Use Ottawa</button>
+      </div>
+
+      <div class="muted" style="margin-top:10px;">
+        Last update: <span id="ts" class="mono">—</span>
+      </div>
+
+      <div class="card" style="margin-top:12px; border-color:#eee;">
+        <h3 style="margin:0 0 6px;">Right now</h3>
+        <div class="muted">
+          Outdoor: <span id="outNowT" class="mono">—</span> °C,
+          <span id="outNowRH" class="mono">—</span> % RH
+        </div>
+        <div class="muted" style="margin-top:6px;">
+          Outdoor AH: <span id="outNowAH" class="mono">—</span> g/m³
+        </div>
+        <div id="recNow" class="big">—</div>
+        <div id="recNowDetail" class="muted" style="margin-top:6px;">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <h2 style="margin:0 0 6px;">Hour-by-hour recommendation</h2>
+    <div class="muted">
+      Logic: compare outdoor AH to indoor AH. If outdoor is ≥ 1.0 g/m³ higher → “Limit/Low”; if ≤ 1.0 g/m³ lower → “Run”; otherwise “Neutral”.
+    </div>
+
+    <div class="scroll" style="margin-top:10px;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:160px;">Local time</th>
+            <th>Outdoor (°C / %RH)</th>
+            <th>Outdoor AH (g/m³)</th>
+            <th>Δ AH (out - in)</th>
+            <th>Recommendation</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="5" class="muted">Fetch outdoor data to populate.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Core math ----------
+    // Absolute Humidity (g/m³) from temperature (°C) and RH (%)
+    function absoluteHumidity_gm3(T, RH) {
+      const es = 6.112 * Math.exp((17.67 * T) / (T + 243.5)); // hPa
+      const e  = es * (RH / 100.0);                            // hPa
+      const AH = (2.1674 * e) / (273.15 + T) * 100.0;         // g/m³
+      return AH;
+    }
+
+    function fmt(x, digits=1) {
+      if (!isFinite(x)) return "—";
+      return Number(x).toFixed(digits);
+    }
+
+    function setText(id, text) {
+      document.getElementById(id).textContent = text;
+    }
+
+    // ---------- Recommendation logic ----------
+    const THRESHOLD = 1.0; // g/m³, adjust to taste
+
+    function recFromDiff(diff) {
+      // diff = outAH - inAH
+      if (!isFinite(diff)) return { label: "—", cls: "", detail: "Enter indoor values and fetch outdoor data." };
+
+      if (diff <= -THRESHOLD) {
+        return { label: "Run HRV (drying)", cls: "ok",
+          detail: `Outdoor AH is ${fmt(Math.abs(diff),1)} g/m³ lower than indoor.` };
+      }
+      if (diff >= THRESHOLD) {
+        return { label: "Limit / Low (adds moisture)", cls: "warn",
+          detail: `Outdoor AH is ${fmt(diff,1)} g/m³ higher than indoor.` };
+      }
+      return { label: "Neutral (AQ-focused)", cls: "ok",
+        detail: `Outdoor vs indoor differs by ${fmt(Math.abs(diff),1)} g/m³.` };
+    }
+
+    // ---------- Open-Meteo fetch ----------
+    async function fetchOutdoorHourly(lat, lon) {
+      // hourly: temperature_2m, relative_humidity_2m
+      // current: temperature_2m, relative_humidity_2m
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+        `&current=temperature_2m,relative_humidity_2m` +
+        `&hourly=temperature_2m,relative_humidity_2m` +
+        `&timezone=auto`;
+
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("Open-Meteo request failed");
+      return await resp.json();
+    }
+
+    // ---------- UI update ----------
+    function getIndoorAH() {
+      const inT  = parseFloat(document.getElementById("inT").value);
+      const inRH = parseFloat(document.getElementById("inRH").value);
+      const inAH = absoluteHumidity_gm3(inT, inRH);
+      setText("inAH", fmt(inAH, 2));
+      setText("thr", fmt(THRESHOLD, 1));
+      return inAH;
+    }
+
+    let lastData = null;   // Open-Meteo response
+    let lastLabel = null;  // location label
+
+    function renderNow(inAH) {
+      if (!lastData || !lastData.current) return;
+
+      const T  = lastData.current.temperature_2m;
+      const RH = lastData.current.relative_humidity_2m;
+      const outAH = absoluteHumidity_gm3(T, RH);
+
+      setText("outNowT", fmt(T, 1));
+      setText("outNowRH", fmt(RH, 0));
+      setText("outNowAH", fmt(outAH, 2));
+
+      const diff = outAH - inAH;
+      const rec = recFromDiff(diff);
+      const recEl = document.getElementById("recNow");
+      recEl.textContent = rec.label;
+      recEl.className = "big " + (rec.cls || "");
+      setText("recNowDetail", rec.detail);
+    }
+
+    function renderHourly(inAH) {
+      const tbody = document.getElementById("rows");
+      tbody.innerHTML = "";
+
+      if (!lastData || !lastData.hourly) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">Fetch outdoor data to populate.</td></tr>`;
+        return;
+      }
+
+      const horizon = parseInt(document.getElementById("horizon").value, 10);
+
+      const times = lastData.hourly.time || [];
+      const temps = lastData.hourly.temperature_2m || [];
+      const rhs   = lastData.hourly.relative_humidity_2m || [];
+
+      // Find the first hourly index >= current time (best-effort)
+      const nowIso = (lastData.current && lastData.current.time) ? lastData.current.time : null;
+      let startIdx = 0;
+      if (nowIso) {
+        const idx = times.indexOf(nowIso);
+        if (idx >= 0) startIdx = idx;
+        else {
+          // fallback: find first future time
+          const nowMs = Date.parse(nowIso);
+          const f = times.findIndex(t => Date.parse(t) >= nowMs);
+          if (f >= 0) startIdx = f;
+        }
+      }
+
+      const endIdx = Math.min(startIdx + horizon, times.length);
+
+      for (let i = startIdx; i < endIdx; i++) {
+        const t = times[i];
+        const T = temps[i];
+        const RH = rhs[i];
+
+        const outAH = absoluteHumidity_gm3(T, RH);
+        const diff = outAH - inAH;
+        const rec = recFromDiff(diff);
+
+        const tr = document.createElement("tr");
+
+        const dt = new Date(t);
+        const local = dt.toLocaleString(undefined, { weekday:"short", hour:"2-digit", minute:"2-digit" });
+
+        tr.innerHTML = `
+          <td class="mono">${local}</td>
+          <td class="mono">${fmt(T,1)} °C / ${fmt(RH,0)}%</td>
+          <td class="mono">${fmt(outAH,2)}</td>
+          <td class="mono">${fmt(diff,2)}</td>
+          <td><span class="pill ${rec.cls}">${rec.label}</span><div class="muted" style="margin-top:4px;">${rec.detail}</div></td>
+        `;
+        tbody.appendChild(tr);
+      }
+
+      if (startIdx === endIdx) {
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">No hourly data available in range.</td></tr>`;
+      }
+    }
+
+    function updateAll() {
+      const inAH = getIndoorAH();
+      renderNow(inAH);
+      renderHourly(inAH);
+    }
+
+    async function setOutdoor(lat, lon, label) {
+      setText("loc", `${label} (${fmt(lat,3)}, ${fmt(lon,3)})`);
+      setText("ts", "…");
+      lastLabel = label;
+
+      try {
+        const data = await fetchOutdoorHourly(lat, lon);
+        lastData = data;
+
+        const ts = (data.current && data.current.time) ? data.current.time : new Date().toISOString();
+        setText("ts", ts);
+
+        updateAll();
+      } catch (e) {
+        lastData = null;
+        setText("ts", "Error");
+        const tbody = document.getElementById("rows");
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${String(e)}</td></tr>`;
+
+        const recEl = document.getElementById("recNow");
+        recEl.textContent = "Could not fetch outdoor data";
+        recEl.className = "big bad";
+        setText("recNowDetail", String(e));
+
+        setText("outNowT", "—");
+        setText("outNowRH", "—");
+        setText("outNowAH", "—");
+      }
+    }
+
+    // ---------- Events ----------
+    document.getElementById("btnGeo").addEventListener("click", () => {
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported in this browser.");
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setOutdoor(pos.coords.latitude, pos.coords.longitude, "Your location"),
+        (err) => alert("Geolocation failed: " + err.message),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      );
+    });
+
+    document.getElementById("btnOttawa").addEventListener("click", () => {
+      setOutdoor(45.4215, -75.6972, "Ottawa");
+    });
+
+    document.getElementById("inT").addEventListener("input", updateAll);
+    document.getElementById("inRH").addEventListener("input", updateAll);
+    document.getElementById("horizon").addEventListener("change", updateAll);
+
+    // Start with Ottawa
+    setOutdoor(45.4215, -75.6972, "Ottawa");
+  </script>
+</body>
+</html>
