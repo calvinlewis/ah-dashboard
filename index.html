@@ -298,7 +298,7 @@
 
     .section-wide { margin-top: 22px; }
 
-    .table-wrap-hint {
+    .hourly-cards {
       display: none;
     }
 
@@ -394,44 +394,82 @@
         padding-left: 1.1rem;
       }
 
-      .scroll {
-        max-height: min(58vh, 420px);
-        border-radius: 10px;
+      .hourly-table-host {
+        display: none !important;
       }
 
-      .table-wrap-hint {
-        display: block;
-        font-size: 0.75rem;
+      .hourly-cards {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 14px;
+        max-height: min(62vh, 520px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        padding: 2px 0 6px;
+      }
+
+      .hourly-cards-empty {
+        margin: 6px 0 0;
+        font-size: 0.875rem;
+      }
+
+      .hourly-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px 14px 12px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .hourly-card__time {
+        font-family: var(--font-mono);
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 12px;
+        letter-spacing: -0.02em;
+      }
+
+      .hourly-card__grid {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        column-gap: 14px;
+        row-gap: 8px;
+        align-items: baseline;
+        margin: 0 0 12px;
+      }
+
+      .hourly-card__grid dt {
+        margin: 0;
         color: var(--text-secondary);
-        margin-top: 10px;
-        margin-bottom: -4px;
-      }
-
-      table {
-        min-width: 580px;
-      }
-
-      th, td {
-        padding: 10px 10px;
-        font-size: 0.78rem;
-      }
-
-      th {
-        font-size: 0.68rem;
-      }
-
-      .pill {
         font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .hourly-card__grid dd {
+        margin: 0;
+        font-size: 0.875rem;
+        font-family: var(--font-mono);
+        font-weight: 500;
+        word-break: break-word;
+      }
+
+      .hourly-card__rec .pill {
+        font-size: 0.75rem;
         padding: 5px 10px;
       }
 
-      tbody tr:active td {
-        background: rgba(13, 148, 136, 0.07);
+      .hourly-card__detail {
+        margin: 8px 0 0;
+        font-size: 0.78rem;
+        line-height: 1.5;
+        color: var(--text-secondary);
       }
 
-      tbody tr:hover td {
-        background: transparent;
-      }
     }
 
     @media (max-width: 380px) {
@@ -520,8 +558,7 @@
       <li>Summer (outdoor ≥ 15°C): default 20 min/hr. Recommend CONT only when outdoor air is <strong>drier than indoor air</strong> (outdoor AH ≤ indoor AH − 0.5 g/m³, or outdoor dew point ≤ 12°C).</li>
       </ul>
     </div>
-<p class="table-wrap-hint" role="note">Swipe horizontally to see all columns.</p>
-<div class="scroll">
+<div class="scroll hourly-table-host" id="hourlyTableHost">
 <table>
 <thead>
 <tr>
@@ -537,6 +574,7 @@
 </tbody>
 </table>
 </div>
+<div class="hourly-cards" id="hourlyCards" aria-live="polite"><p class="muted hourly-cards-empty">Fetch outdoor data to populate.</p></div>
 </div>
 </div>
 <script>
@@ -556,6 +594,43 @@
 
     function setText(id, text) {
       document.getElementById(id).textContent = text;
+    }
+
+    function escapeHtml(s) {
+      const el = document.createElement("div");
+      el.textContent = s;
+      return el.innerHTML;
+    }
+
+    function hourlyCardHtml(local, T, RH, outAH, inAH, rec) {
+      const pillClass = rec.cls ? `pill ${rec.cls}` : "pill";
+      return (
+        `<article class="hourly-card">` +
+        `<header class="hourly-card__time">${escapeHtml(local)}</header>` +
+        `<dl class="hourly-card__grid">` +
+        `<dt>Outdoor</dt><dd>${escapeHtml(`${fmt(T, 1)} °C / ${fmt(RH, 0)}%`)}</dd>` +
+        `<dt>Outdoor AH</dt><dd>${escapeHtml(`${fmt(outAH, 2)} g/m³`)}</dd>` +
+        `<dt>Indoor AH</dt><dd>${escapeHtml(`${fmt(inAH, 2)} g/m³`)}</dd>` +
+        `</dl>` +
+        `<div class="hourly-card__rec">` +
+        `<span class="${pillClass}">${escapeHtml(rec.label)}</span>` +
+        `<p class="hourly-card__detail">${escapeHtml(rec.detail)}</p>` +
+        `</div></article>`
+      );
+    }
+
+    function syncHourlyPresentation() {
+      const mq = window.matchMedia("(max-width: 640px)");
+      const tableHost = document.getElementById("hourlyTableHost");
+      const cards = document.getElementById("hourlyCards");
+      const apply = () => {
+        const mobile = mq.matches;
+        if (tableHost) tableHost.setAttribute("aria-hidden", mobile ? "true" : "false");
+        if (cards) cards.setAttribute("aria-hidden", mobile ? "false" : "true");
+      };
+      apply();
+      if (typeof mq.addEventListener === "function") mq.addEventListener("change", apply);
+      else if (typeof mq.addListener === "function") mq.addListener(apply);
     }
 
     // ---------- Recommendation logic ----------
@@ -714,10 +789,13 @@ function recHRV(outT, outRH, inAH, inDP, acOn) {
 
     function renderHourly(st) {
       const tbody = document.getElementById("rows");
+      const cardsEl = document.getElementById("hourlyCards");
       tbody.innerHTML = "";
+      cardsEl.innerHTML = "";
 
       if (!lastData || !lastData.hourly) {
         tbody.innerHTML = `<tr><td colspan="5" class="muted">Fetch outdoor data to populate.</td></tr>`;
+        cardsEl.innerHTML = `<p class="muted hourly-cards-empty">Fetch outdoor data to populate.</p>`;
         return;
       }
 
@@ -743,6 +821,8 @@ function recHRV(outT, outRH, inAH, inDP, acOn) {
 
       const endIdx = Math.min(startIdx + horizon, times.length);
 
+      const cardParts = [];
+
       for (let i = startIdx; i < endIdx; i++) {
         const t = times[i];
         const T = temps[i];
@@ -761,13 +841,18 @@ function recHRV(outT, outRH, inAH, inDP, acOn) {
           <td class="mono">${fmt(T,1)} °C / ${fmt(RH,0)}%</td>
           <td class="mono">${fmt(outAH,2)}</td>
           <td class="mono">${fmt(st.inAH,2)}</td>
-          <td><span class="pill ${rec.cls}">${rec.label}</span><div class="muted" style="margin-top:4px;">${rec.detail}</div></td>
+          <td><span class="pill ${rec.cls}">${rec.label}</span><div class="muted" style="margin-top:4px;">${escapeHtml(rec.detail)}</div></td>
         `;
         tbody.appendChild(tr);
+
+        cardParts.push(hourlyCardHtml(local, T, RH, outAH, st.inAH, rec));
       }
+
+      cardsEl.innerHTML = cardParts.join("");
 
       if (startIdx === endIdx) {
         tbody.innerHTML = `<tr><td colspan="5" class="muted">No hourly data available in range.</td></tr>`;
+        cardsEl.innerHTML = `<p class="muted hourly-cards-empty">No hourly data available in range.</p>`;
       }
     }
 
@@ -794,7 +879,9 @@ function recHRV(outT, outRH, inAH, inDP, acOn) {
         lastData = null;
         setText("ts", "Error");
         const tbody = document.getElementById("rows");
-        tbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${String(e)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="muted">Error: ${escapeHtml(String(e))}</td></tr>`;
+        const cardsEl = document.getElementById("hourlyCards");
+        if (cardsEl) cardsEl.innerHTML = `<p class="muted hourly-cards-empty">Error: ${escapeHtml(String(e))}</p>`;
 
         const recEl = document.getElementById("recNow");
         recEl.textContent = "Could not fetch outdoor data";
@@ -829,6 +916,8 @@ function recHRV(outT, outRH, inAH, inDP, acOn) {
     document.getElementById("inRH").addEventListener("input", updateAll);
     document.getElementById("acOn").addEventListener("change", updateAll);
     document.getElementById("horizon").addEventListener("change", updateAll);
+
+    syncHourlyPresentation();
 
     // Start with Almonte, Ontario
     setOutdoor(45.2260, -76.1950, "Almonte, Ontario");
