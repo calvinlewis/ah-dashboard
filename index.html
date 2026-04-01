@@ -1,120 +1,545 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Absolute Humidity (Hourly) HRV Dashboard</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; max-width: 980px; }
-    h1 { margin: 0 0 10px; }
-    .muted { color: #666; font-size: 14px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; flex: 1 1 300px; }
-    label { display: block; font-size: 14px; margin: 10px 0 6px; }
-    input, select { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; }
-    button { padding: 10px 14px; font-size: 16px; border-radius: 10px; border: 1px solid #bbb; background: #f7f7f7; cursor: pointer; }
-    button:hover { background: #eee; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .big { font-size: 24px; font-weight: 650; margin-top: 8px; }
-    .ok { color: #0a7a2f; }
-    .warn { color: #b35c00; }
-    .bad { color: #b00020; }
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<meta content="#f0f2f7" name="theme-color"/>
+<title>Absolute Humidity (Hourly) HRV Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+    *, *::before, *::after { box-sizing: border-box; }
 
-    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 14px; vertical-align: top; }
-    th { position: sticky; top: 0; background: #fff; z-index: 1; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid #ddd; font-size: 12px; }
-    .pill.ok { border-color: rgba(10,122,47,0.35); }
-    .pill.warn { border-color: rgba(179,92,0,0.35); }
-    .pill.bad { border-color: rgba(176,0,32,0.35); }
-    .scroll { max-height: 520px; overflow: auto; border: 1px solid #eee; border-radius: 10px; }
-  </style>
+    :root {
+      --bg: #f0f2f7;
+      --bg-elevated: #ffffff;
+      --text: #0f172a;
+      --text-secondary: #64748b;
+      --border: rgba(15, 23, 42, 0.08);
+      --border-strong: rgba(15, 23, 42, 0.12);
+      --accent: #0d9488;
+      --accent-hover: #0f766e;
+      --accent-muted: rgba(13, 148, 136, 0.12);
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+      --radius: 14px;
+      --radius-sm: 10px;
+      --ok: #047857;
+      --warn: #b45309;
+      --bad: #be123c;
+      --font-sans: "DM Sans", system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    html { color-scheme: light; }
+
+    body {
+      font-family: var(--font-sans);
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 100% -10%, rgba(13, 148, 136, 0.09), transparent 55%),
+        radial-gradient(900px 500px at -5% 100%, rgba(99, 102, 241, 0.06), transparent 50%),
+        var(--bg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .app {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-right: max(16px, env(safe-area-inset-right));
+      padding-bottom: max(32px, env(safe-area-inset-bottom));
+      padding-left: max(16px, env(safe-area-inset-left));
+    }
+
+    @media (min-width: 641px) {
+      .app {
+        padding: clamp(20px, 4vw, 40px) clamp(16px, 3vw, 28px) 48px;
+        padding-top: max(clamp(20px, 4vw, 40px), env(safe-area-inset-top));
+        padding-right: max(clamp(16px, 3vw, 28px), env(safe-area-inset-right));
+        padding-bottom: max(48px, env(safe-area-inset-bottom));
+        padding-left: max(clamp(16px, 3vw, 28px), env(safe-area-inset-left));
+      }
+    }
+
+    .hero {
+      margin-bottom: 28px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.5rem, 4vw, 1.85rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .lead {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      max-width: 62ch;
+    }
+
+    .muted { color: var(--text-secondary); font-size: 0.875rem; }
+
+    .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: stretch; }
+
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      flex: 1 1 300px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .card-nested {
+      margin-top: 14px;
+      padding: 16px;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(160deg, rgba(13, 148, 136, 0.05) 0%, rgba(15, 23, 42, 0.03) 100%);
+      border: 1px solid var(--border);
+    }
+
+    label { display: block; font-size: 0.8125rem; font-weight: 500; margin: 12px 0 6px; color: var(--text); }
+
+    input[type="number"], select {
+      width: 100%;
+      padding: 11px 13px;
+      font-size: 1rem;
+      font-family: var(--font-sans);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input[type="number"]:hover, select:hover { border-color: rgba(15, 23, 42, 0.2); }
+
+    input[type="number"]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-muted);
+    }
+
+    .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+
+    button {
+      padding: 10px 16px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      font-family: var(--font-sans);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-elevated);
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    }
+
+    button:hover {
+      background: rgba(15, 23, 42, 0.04);
+      border-color: rgba(15, 23, 42, 0.18);
+    }
+
+    button:active { transform: scale(0.98); }
+
+    button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: #fff;
+    }
+
+    button.primary:hover {
+      background: var(--accent-hover);
+      border-color: transparent;
+    }
+
+    .mono { font-family: var(--font-mono); font-size: 0.9em; font-weight: 500; }
+
+    .stat-line { margin-top: 10px; }
+    .stat-line.tight { margin-top: 6px; }
+
+    .big {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-top: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+
+    .rules {
+      font-size: 0.875rem;
+      line-height: 1.65;
+      color: var(--text-secondary);
+    }
+
+    .rules ul {
+      margin: 10px 0 0;
+      padding-left: 1.15rem;
+    }
+
+    .rules li { margin: 6px 0; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+    th, td {
+      border-bottom: 1px solid var(--border);
+      padding: 11px 12px;
+      text-align: left;
+      font-size: 0.8125rem;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 1;
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+    }
+
+    tbody tr:hover td { background: rgba(13, 148, 136, 0.04); }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      font-size: 0.75rem;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.8);
+    }
+
+    .pill.ok { border-color: rgba(4, 120, 87, 0.35); background: rgba(4, 120, 87, 0.08); color: var(--ok); }
+    .pill.warn { border-color: rgba(180, 83, 9, 0.35); background: rgba(180, 83, 9, 0.08); color: var(--warn); }
+    .pill.bad { border-color: rgba(190, 18, 60, 0.35); background: rgba(190, 18, 60, 0.08); color: var(--bad); }
+
+    .scroll {
+      max-height: 520px;
+      overflow: auto;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-top: 14px;
+      background: var(--bg-elevated);
+    }
+
+    .scroll table { margin-top: 0; }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.02);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .checkbox-row input { accent-color: var(--accent); }
+
+    .checkbox-row label {
+      margin: 0;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    input.checkbox { width: auto; padding: 0; margin: 0; flex-shrink: 0; }
+
+    .section-wide { margin-top: 22px; }
+
+    .table-wrap-hint {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        margin-bottom: 20px;
+      }
+
+      h1 {
+        font-size: clamp(1.35rem, 5.5vw, 1.75rem);
+      }
+
+      .lead {
+        font-size: 0.9rem;
+        line-height: 1.55;
+      }
+
+      .row {
+        gap: 14px;
+      }
+
+      .card {
+        flex: 1 1 100%;
+        min-width: 0;
+        padding: 16px 14px;
+        border-radius: 12px;
+      }
+
+      .card h2 {
+        font-size: 1rem;
+        margin-bottom: 12px;
+      }
+
+      .card-nested {
+        padding: 14px 12px;
+        margin-top: 12px;
+      }
+
+      label {
+        font-size: 0.8125rem;
+        margin-top: 10px;
+      }
+
+      input[type="number"],
+      select {
+        padding: 14px 14px;
+        min-height: 48px;
+        font-size: 16px;
+      }
+
+      .checkbox-row {
+        min-height: 48px;
+        padding: 12px 14px;
+        align-items: flex-start;
+      }
+
+      .checkbox-row input {
+        width: 22px;
+        height: 22px;
+        margin-top: 2px;
+      }
+
+      .btn-row {
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 8px;
+      }
+
+      .btn-row button {
+        width: 100%;
+        min-height: 48px;
+        padding: 14px 18px;
+        font-size: 1rem;
+        touch-action: manipulation;
+      }
+
+      .big {
+        font-size: clamp(1.35rem, 6vw, 1.65rem);
+        line-height: 1.25;
+        word-break: break-word;
+      }
+
+      .section-wide {
+        margin-top: 14px;
+      }
+
+      .rules {
+        font-size: 0.8125rem;
+        line-height: 1.6;
+      }
+
+      .rules ul {
+        padding-left: 1.1rem;
+      }
+
+      .scroll {
+        max-height: min(58vh, 420px);
+        border-radius: 10px;
+      }
+
+      .table-wrap-hint {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        margin-top: 10px;
+        margin-bottom: -4px;
+      }
+
+      table {
+        min-width: 580px;
+      }
+
+      th, td {
+        padding: 10px 10px;
+        font-size: 0.78rem;
+      }
+
+      th {
+        font-size: 0.68rem;
+      }
+
+      .pill {
+        font-size: 0.7rem;
+        padding: 5px 10px;
+      }
+
+      tbody tr:active td {
+        background: rgba(13, 148, 136, 0.07);
+      }
+
+      tbody tr:hover td {
+        background: transparent;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .app {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+      }
+
+      .card {
+        padding: 14px 12px;
+      }
+    }
+</style>
 </head>
-
 <body>
-  <h1>Absolute Humidity (Hourly) HRV Dashboard</h1>
-  <p class="muted">
+<div class="app">
+<header class="hero">
+<p class="eyebrow">Ventilation</p>
+<h1>Absolute Humidity (Hourly) HRV Dashboard</h1>
+<p class="lead">
     Outdoor hourly forecast comes from Open-Meteo. Indoor values are assumed constant across the horizon unless you wire in a sensor feed.
   </p>
+</header>
+<div class="row">
+<div class="card">
+<h2>Indoor (you enter)</h2>
+<div class="field" style="width:100%;">
+<label for="inT">Temperature (°C)</label>
+<input id="inT" step="0.1" style="width:100%;" type="number" value="21.0"/>
+<label for="inRH">Relative Humidity (%)</label>
+<input id="inRH" step="0.1" style="width:100%;" type="number" value="40.0"/>
+<label class="checkbox-row" for="acOn"><input class="checkbox" id="acOn" type="checkbox"/><span>AC currently ON (summer)</span></label>
+</div>
 
-  <div class="row">
-    <div class="card">
-      <h2 style="margin:0 0 8px;">Indoor (you enter)</h2>
-      <label for="inT">Temperature (°C)</label>
-      <input id="inT" type="number" step="0.1" value="21.0" />
-
-      <label for="inRH">Relative Humidity (%)</label>
-      <input id="inRH" type="number" step="0.1" value="40.0" />
-
-      <label for="horizon">Forecast horizon</label>
-      <select id="horizon">
-        <option value="12">Next 12 hours</option>
-        <option value="24" selected>Next 24 hours</option>
-        <option value="48">Next 48 hours</option>
-        <option value="72">Next 72 hours</option>
-      </select>
-
-      <div class="muted" style="margin-top:10px;">
-        Indoor AH: <span id="inAH" class="mono">—</span> g/m³
+<label for="horizon">Forecast horizon</label>
+<select id="horizon">
+<option value="12">Next 12 hours</option>
+<option selected="" value="24">Next 24 hours</option>
+<option value="48">Next 48 hours</option>
+<option value="72">Next 72 hours</option>
+</select>
+<div class="muted stat-line">
+        Indoor AH: <span class="mono" id="inAH">—</span> g/m³
       </div>
-      <div class="muted" style="margin-top:6px;">
-        Threshold (g/m³): <span id="thr" class="mono">1.0</span> (edit in code if desired)
+<div class="muted stat-line tight">
+        Indoor dew point: <span class="mono" id="inDP">—</span> °C
       </div>
-    </div>
-
-    <div class="card">
-      <h2 style="margin:0 0 8px;">Outdoor (auto)</h2>
-      <div class="muted">Location: <span id="loc" class="mono">—</span></div>
-
-      <div class="row" style="margin-top:10px;">
-        <button id="btnGeo">Use my location</button>
-        <button id="btnOttawa">Use Ottawa</button>
-      </div>
-
-      <div class="muted" style="margin-top:10px;">
-        Last update: <span id="ts" class="mono">—</span>
-      </div>
-
-      <div class="card" style="margin-top:12px; border-color:#eee;">
-        <h3 style="margin:0 0 6px;">Right now</h3>
-        <div class="muted">
-          Outdoor: <span id="outNowT" class="mono">—</span> °C,
-          <span id="outNowRH" class="mono">—</span> % RH
+</div>
+<div class="card">
+<h2>Outdoor (auto)</h2>
+<div class="muted">Location: <span class="mono" id="loc">—</span></div>
+<div class="btn-row">
+<button class="primary" id="btnGeo" type="button">Use my location</button>
+<button id="btnAlmonte" type="button">Use Almonte (ON)</button>
+</div>
+<div class="muted stat-line">
+        Last update: <span class="mono" id="ts">—</span>
+</div>
+<div class="card-nested">
+<h3>Right now</h3>
+<div class="muted">
+          Outdoor: <span class="mono" id="outNowT">—</span> °C,
+          <span class="mono" id="outNowRH">—</span> % RH
         </div>
-        <div class="muted" style="margin-top:6px;">
-          Outdoor AH: <span id="outNowAH" class="mono">—</span> g/m³
+<div class="muted stat-line tight">
+          Outdoor AH: <span class="mono" id="outNowAH">—</span> g/m³
         </div>
-        <div id="recNow" class="big">—</div>
-        <div id="recNowDetail" class="muted" style="margin-top:6px;">—</div>
-      </div>
+<div class="muted stat-line tight">
+          Regime: <span class="pill mono" id="regime">—</span>
+</div>
+<div class="big" id="recNow">—</div>
+<div class="muted stat-line tight" id="recNowDetail">—</div>
+</div>
+</div>
+</div>
+<div class="card section-wide">
+<h2>Hour-by-hour recommendation</h2>
+<div class="rules">
+      <p style="margin:0 0 10px;">Logic: recommend HRV mode (ECO 10 min/hr, 20 min/hr, or CONT) using <strong>indoor absolute humidity &amp; dew point</strong> plus <strong>outdoor temperature and humidity</strong> (to compute outdoor absolute humidity / dew point).</p>
+      <p style="margin:0 0 6px; font-weight:600; color:var(--text);">Rules (summary)</p>
+      <ul>
+      <li>Moisture-risk override (any season): if indoor dew point &gt; +4°C (cold-season condensation risk) → CONT.</li>
+      <li>Deep-cold dryness recovery: if outdoor &lt; −10°C AND indoor AH ≤ 5.1 g/m³ → ECO (temporary, 24–48h, comfort-driven).</li>
+      <li>Winter (outdoor &lt; −5°C): default 20 min/hr, but CONT if indoor AH &gt; 8.5 g/m³.</li>
+      <li>Shoulder (−5°C ≤ outdoor &lt; 15°C): CONT if indoor AH ≥ 6.5 g/m³, else 20 min/hr.</li>
+      <li>Summer (outdoor ≥ 15°C): default 20 min/hr. Recommend CONT only when outdoor air is <strong>drier than indoor air</strong> (outdoor AH ≤ indoor AH − 0.5 g/m³, or outdoor dew point ≤ 12°C).</li>
+      </ul>
     </div>
-  </div>
-
-  <div class="card" style="margin-top:16px;">
-    <h2 style="margin:0 0 6px;">Hour-by-hour recommendation</h2>
-    <div class="muted">
-      Logic: compare outdoor AH to indoor AH. If outdoor is ≥ 1.0 g/m³ higher → “Limit/Low”; if ≤ 1.0 g/m³ lower → “Run”; otherwise “Neutral”.
-    </div>
-
-    <div class="scroll" style="margin-top:10px;">
-      <table>
-        <thead>
-          <tr>
-            <th style="width:160px;">Local time</th>
-            <th>Outdoor (°C / %RH)</th>
-            <th>Outdoor AH (g/m³)</th>
-            <th>Δ AH (out - in)</th>
-            <th>Recommendation</th>
-          </tr>
-        </thead>
-        <tbody id="rows">
-          <tr><td colspan="5" class="muted">Fetch outdoor data to populate.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <script>
+<p class="table-wrap-hint" role="note">Swipe horizontally to see all columns.</p>
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th style="width:160px;">Local time</th>
+<th>Outdoor (°C / %RH)</th>
+<th>Outdoor AH (g/m³)</th>
+<th>Indoor AH (g/m³)</th>
+<th>Recommendation</th>
+</tr>
+</thead>
+<tbody id="rows">
+<tr><td class="muted" colspan="5">Fetch outdoor data to populate.</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<script>
     // ---------- Core math ----------
     // Absolute Humidity (g/m³) from temperature (°C) and RH (%)
     function absoluteHumidity_gm3(T, RH) {
@@ -134,25 +559,108 @@
     }
 
     // ---------- Recommendation logic ----------
-    const THRESHOLD = 1.0; // g/m³, adjust to taste
+// This dashboard recommends HRV modes based on:
+//   - Indoor absolute humidity (g/m³) + indoor dew point (°C)
+//   - Outdoor temperature (°C)
+// Notes:
+//   - ECO (10 min/hr) is intended as a temporary “dryness recovery” mode in deep cold.
+//   - CONT is recommended when indoor moisture is high (risk of condensation), or when outdoor is mild and indoor AH is in/above comfort zone.
 
-    function recFromDiff(diff) {
-      // diff = outAH - inAH
-      if (!isFinite(diff)) return { label: "—", cls: "", detail: "Enter indoor values and fetch outdoor data." };
+// Dew point (°C) from temperature (°C) and RH (%)
+function dewPoint_C(T, RH) {
+  const a = 17.62;
+  const b = 243.12;
+  const rh = Math.max(0.1, Math.min(100.0, RH));
+  const gamma = Math.log(rh / 100.0) + (a * T) / (b + T);
+  return (b * gamma) / (a - gamma);
+}
 
-      if (diff <= -THRESHOLD) {
-        return { label: "Run HRV (drying)", cls: "ok",
-          detail: `Outdoor AH is ${fmt(Math.abs(diff),1)} g/m³ lower than indoor.` };
+function classifyRegime(outT, outDP, acOn) {
+  // Regime is informational only (shown in UI)
+  if (!isFinite(outT) || !isFinite(outDP)) return "—";
+  if (outT >= 15.0) {
+    if (acOn) {
+      // With AC running, treat humid summer as a ventilation-restraint regime.
+      if (outDP >= 12.0) return "Summer (humid, AC on)";
+      return "Summer (dry, AC on)";
+    }
+    // With AC off, behave more like shoulder season.
+    return "Summer (AC off)";
+  }
+  if (outT < -5.0) return "Winter";
+  return "Shoulder";
+}
+
+function recHRV(outT, outRH, inAH, inDP, acOn) {
+  if (!isFinite(outT) || !isFinite(outRH) || !isFinite(inAH) || !isFinite(inDP)) {
+    return { label: "—", cls: "", detail: "Enter indoor values and fetch outdoor data." };
+  }
+
+  const outAH = absoluteHumidity_gm3(outT, outRH);
+  const outDP = dewPoint_C(outT, outRH);
+
+  // --- Cold-season condensation guardrail ---
+  // This is most relevant when outdoor is cold enough that windows are cold.
+  if (outT < 10.0 && inDP > 4.0) {
+    return { label: "CONT", cls: "bad", detail: `Indoor dew point ${fmt(inDP,1)}°C is high for cool/cold conditions (condensation risk).` };
+  }
+
+  // --- Summer logic (outdoor >= 15°C) ---
+  // In summer, an HRV is not a dehumidifier; it often IMPORTS moisture.
+  // If AC is ON, default to 20 min/hr and only use CONT when outdoor air is clearly drier than indoor.
+  // If AC is OFF, behave more like shoulder season (CONT is fine when indoor AH is in the comfort zone).
+  if (outT >= 15.0) {
+    if (acOn) {
+      const outdoorIsDrier = (outAH <= (inAH - 0.5)) || (outDP <= 12.0);
+      if (outdoorIsDrier) {
+        return { label: "CONT", cls: "ok",
+          detail: `Summer (AC on): outdoor air is drier than indoor (outdoor AH ${fmt(outAH,2)} vs indoor ${fmt(inAH,2)} g/m³; outdoor DP ${fmt(outDP,1)}°C). CONT can help with comfort/IAQ.` };
       }
-      if (diff >= THRESHOLD) {
-        return { label: "Limit / Low (adds moisture)", cls: "warn",
-          detail: `Outdoor AH is ${fmt(diff,1)} g/m³ higher than indoor.` };
-      }
-      return { label: "Neutral (AQ-focused)", cls: "ok",
-        detail: `Outdoor vs indoor differs by ${fmt(Math.abs(diff),1)} g/m³.` };
+      return { label: "20 min/hr", cls: "ok",
+        detail: `Summer (AC on): outdoor air is as humid or more humid than indoors (outdoor AH ${fmt(outAH,2)} vs indoor ${fmt(inAH,2)} g/m³; outdoor DP ${fmt(outDP,1)}°C). Stay at 20 min/hr; use Turbo only for moisture events. Let AC/dehumidification handle humidity.` };
     }
 
-    // ---------- Open-Meteo fetch ----------
+    // AC OFF: treat as shoulder season
+    if (inAH < 6.5) {
+      return { label: "20 min/hr", cls: "ok",
+        detail: `Summer (AC off): indoor AH ${fmt(inAH,2)} g/m³ is on the dry side. Use 20 min/hr; use Turbo only for moisture events.` };
+    }
+    return { label: "CONT", cls: "ok",
+      detail: `Summer (AC off): CONT is appropriate for IAQ/comfort (indoor AH ${fmt(inAH,2)} g/m³; indoor DP ${fmt(inDP,1)}°C). Use Turbo for moisture events; if indoor feels sticky, reduce back to 20 min/hr.` };
+  }
+
+  // --- Deep-cold dryness recovery (winter only) ---
+  if (outT < -10.0 && inAH <= 5.1) {
+    return { label: "ECO (10 min/hr)", cls: "warn",
+      detail: `Very cold (${fmt(outT,1)}°C) and indoor AH ${fmt(inAH,2)} g/m³ (dry). Use ECO temporarily (24–48h) if comfort is compromised.` };
+  }
+
+  // --- Dryness guardrail (comfort-driven) ---
+  if (inDP < -2.0) {
+    return { label: "20 min/hr", cls: "ok",
+      detail: `Indoor dew point ${fmt(inDP,1)}°C is low (dry). Stay at minimum safe ventilation.` };
+  }
+
+  // --- Winter logic (outdoor < -5°C) ---
+  if (outT < -5.0) {
+    if (inAH > 8.5) {
+      return { label: "CONT", cls: "warn",
+        detail: `Indoor AH ${fmt(inAH,2)} g/m³ is high; CONT helps reduce moisture, but will dry quickly in cold air.` };
+    }
+    return { label: "20 min/hr", cls: "ok",
+      detail: `Winter conditions (${fmt(outT,1)}°C). Default to 20 min/hr to protect comfort while maintaining IAQ.` };
+  }
+
+  // --- Shoulder logic (-5°C to <15°C) ---
+  if (inAH >= 6.5) {
+    return { label: "CONT", cls: "ok",
+      detail: `Shoulder weather (${fmt(outT,1)}°C) and indoor AH ${fmt(inAH,2)} g/m³. CONT is appropriate.` };
+  }
+  return { label: "20 min/hr", cls: "ok",
+    detail: `Shoulder weather (${fmt(outT,1)}°C) but indoor AH ${fmt(inAH,2)} g/m³ is still low. Stay on 20 min/hr.` };
+}
+
+// ---------- Open-Meteo fetch ----------
     async function fetchOutdoorHourly(lat, lon) {
       // hourly: temperature_2m, relative_humidity_2m
       // current: temperature_2m, relative_humidity_2m
@@ -168,38 +676,43 @@
     }
 
     // ---------- UI update ----------
-    function getIndoorAH() {
-      const inT  = parseFloat(document.getElementById("inT").value);
-      const inRH = parseFloat(document.getElementById("inRH").value);
-      const inAH = absoluteHumidity_gm3(inT, inRH);
-      setText("inAH", fmt(inAH, 2));
-      setText("thr", fmt(THRESHOLD, 1));
-      return inAH;
-    }
+    function getIndoorState() {
+  const inT  = parseFloat(document.getElementById("inT").value);
+  const inRH = parseFloat(document.getElementById("inRH").value);
+  const acOn = !!document.getElementById("acOn")?.checked;
+  const inAH = absoluteHumidity_gm3(inT, inRH);
+  const inDP = dewPoint_C(inT, inRH);
+
+  setText("inAH", fmt(inAH, 2));
+  setText("inDP", fmt(inDP, 1));
+  return { inAH, inDP, acOn };
+}
 
     let lastData = null;   // Open-Meteo response
     let lastLabel = null;  // location label
 
-    function renderNow(inAH) {
-      if (!lastData || !lastData.current) return;
+    function renderNow(st) {
+  if (!lastData || !lastData.current) return;
 
-      const T  = lastData.current.temperature_2m;
-      const RH = lastData.current.relative_humidity_2m;
-      const outAH = absoluteHumidity_gm3(T, RH);
+  const T  = lastData.current.temperature_2m;
+  const RH = lastData.current.relative_humidity_2m;
+  const outAH = absoluteHumidity_gm3(T, RH);
 
-      setText("outNowT", fmt(T, 1));
-      setText("outNowRH", fmt(RH, 0));
-      setText("outNowAH", fmt(outAH, 2));
+  setText("outNowT", fmt(T, 1));
+  setText("outNowRH", fmt(RH, 0));
+  setText("outNowAH", fmt(outAH, 2));
 
-      const diff = outAH - inAH;
-      const rec = recFromDiff(diff);
-      const recEl = document.getElementById("recNow");
-      recEl.textContent = rec.label;
-      recEl.className = "big " + (rec.cls || "");
-      setText("recNowDetail", rec.detail);
-    }
+  const rec = recHRV(T, RH, st.inAH, st.inDP, st.acOn);
 
-    function renderHourly(inAH) {
+  const outDP = dewPoint_C(T, RH);
+  setText("regime", classifyRegime(T, outDP, st.acOn));
+  const recEl = document.getElementById("recNow");
+  recEl.textContent = rec.label;
+  recEl.className = "big " + (rec.cls || "");
+  setText("recNowDetail", rec.detail);
+}
+
+    function renderHourly(st) {
       const tbody = document.getElementById("rows");
       tbody.innerHTML = "";
 
@@ -236,8 +749,7 @@
         const RH = rhs[i];
 
         const outAH = absoluteHumidity_gm3(T, RH);
-        const diff = outAH - inAH;
-        const rec = recFromDiff(diff);
+        const rec = recHRV(T, RH, st.inAH, st.inDP, st.acOn);
 
         const tr = document.createElement("tr");
 
@@ -248,7 +760,7 @@
           <td class="mono">${local}</td>
           <td class="mono">${fmt(T,1)} °C / ${fmt(RH,0)}%</td>
           <td class="mono">${fmt(outAH,2)}</td>
-          <td class="mono">${fmt(diff,2)}</td>
+          <td class="mono">${fmt(st.inAH,2)}</td>
           <td><span class="pill ${rec.cls}">${rec.label}</span><div class="muted" style="margin-top:4px;">${rec.detail}</div></td>
         `;
         tbody.appendChild(tr);
@@ -260,9 +772,9 @@
     }
 
     function updateAll() {
-      const inAH = getIndoorAH();
-      renderNow(inAH);
-      renderHourly(inAH);
+      const st = getIndoorState();
+      renderNow(st);
+      renderHourly(st);
     }
 
     async function setOutdoor(lat, lon, label) {
@@ -292,6 +804,7 @@
         setText("outNowT", "—");
         setText("outNowRH", "—");
         setText("outNowAH", "—");
+        setText("regime", "—");
       }
     }
 
@@ -308,16 +821,17 @@
       );
     });
 
-    document.getElementById("btnOttawa").addEventListener("click", () => {
-      setOutdoor(45.4215, -75.6972, "Ottawa");
+    document.getElementById("btnAlmonte").addEventListener("click", () => {
+      setOutdoor(45.2260, -76.1950, "Almonte, Ontario");
     });
 
     document.getElementById("inT").addEventListener("input", updateAll);
     document.getElementById("inRH").addEventListener("input", updateAll);
+    document.getElementById("acOn").addEventListener("change", updateAll);
     document.getElementById("horizon").addEventListener("change", updateAll);
 
-    // Start with Ottawa
-    setOutdoor(45.4215, -75.6972, "Ottawa");
+    // Start with Almonte, Ontario
+    setOutdoor(45.2260, -76.1950, "Almonte, Ontario");
   </script>
 </body>
 </html>
